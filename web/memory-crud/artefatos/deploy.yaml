@@ -1,0 +1,26 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  creationTimestamp: null
+  labels:
+    app: web-api
+  name: web-api
+spec:
+  replicas: 5
+  selector:
+    matchLabels:
+      app: web-api
+  strategy: {}
+  template:
+    metadata:
+      creationTimestamp: null
+      labels:
+        app: web-api
+    spec:
+      containers:
+      - image: godoy.azurecr.io/memory-crud:v1
+        name: memory-crud
+        resources: {}
+        ports:
+        - containerPort: 8080
+status: {}
