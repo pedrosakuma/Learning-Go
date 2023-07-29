@@ -18,7 +18,7 @@ spec:
         app: web-api
     spec:
       containers:
-      - image: godoy.azurecr.io/memory-crud:v1
+      - image: godoy.azurecr.io/memory-crud:v4
         name: memory-crud
         resources: {}
         ports:

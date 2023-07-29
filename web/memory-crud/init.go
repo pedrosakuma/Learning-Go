@@ -3,6 +3,7 @@ package main
 import (
 	"net/http"
 	"strconv"
+	"time"
 
 	"github.com/gin-gonic/gin"
 )
@@ -23,6 +24,10 @@ var albums = []album{
 func main() {
 	router := gin.Default()
 
+	initTelemetry()
+
+	router.Use(Telemetry())
+
 	router.GET("/", getAlbuns)
 	router.GET("/:id", getAlbunsById)
 
@@ -30,6 +35,7 @@ func main() {
 }
 
 func getAlbuns(c *gin.Context) {
+	time.Sleep(1 * time.Second)
 	c.IndentedJSON(http.StatusOK, albums)
 }
 
@@ -53,10 +59,6 @@ func getAlbunsById(c *gin.Context) {
 	}
 }
 
-//Create a comment that describes what is the := operation
-
-// The := operator is a short assignment statement that can be used
-// to declare and assign values to variables.
 func bynaRySearchAlmbum(id int) int {
 	length := len(albums)
 	mid := length / 2
