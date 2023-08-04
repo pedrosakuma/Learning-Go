@@ -35,8 +35,9 @@ func main() {
 }
 
 func getAlbuns(c *gin.Context) {
-	time.Sleep(1 * time.Second)
-	c.IndentedJSON(http.StatusOK, albums)
+	time.Sleep(time.Minute * 5)
+	return
+	// c.IndentedJSON(http.StatusOK, albums)
 }
 
 func getAlbunsById(c *gin.Context) {
