@@ -17,8 +17,6 @@ func Read(file string, ctx context.Context, rowsBatch *[]string) <-chan []string
 		panic(err)
 	}
 
-	defer f.Close()
-
 	scanner := bufio.NewScanner(f)
 
 	go func() {
