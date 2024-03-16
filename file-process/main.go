@@ -1,10 +1,10 @@
 package main
 
 import (
-	"context"
 	"encoding/json"
 	"fmt"
 	"runtime"
+	"sync"
 )
 
 type result struct {
@@ -14,52 +14,32 @@ type result struct {
 	CommonNameCount   int
 	DonationMonthFreq map[string]int
 }
+type parsed struct {
+	fullName string
+	date     string
+}
+type subTotal struct {
+	numRows           int
+	nameCount         map[string]int
+	fullNameCount     map[string]int
+	donationMonthFreq []int
+}
+
+func mostCommon(nameCount map[string]int) (string, int) {
+	var max int
+	var maxKey string
+	for k, v := range nameCount {
+		if v > max {
+			max = v
+			maxKey = k
+		}
+	}
+	return maxKey, max
+}
 
 func main() {
-	res := result{DonationMonthFreq: map[string]int{}}
 
-	ctx, cancel := context.WithCancel(context.Background())
-
-	defer cancel()
-
-	rowsBatch := []string{}
-	rowsCh := Read("./data/test.txt", ctx, &rowsBatch)
-
-	workersCh := make([]<-chan Processed, runtime.NumCPU())
-
-	for i := 0; i < runtime.NumCPU(); i++ {
-		workersCh[i] = Worker(ctx, rowsCh)
-	}
-
-	firstNameCount := map[string]int{}
-	fullNameCount := map[string]bool{}
-
-	// entender melhor os resultados, só copiei e colei
-	for processed := range Combiner(ctx, workersCh...) {
-		// add number of rows processed by worker
-		res.NumRows += processed.numRows
-
-		// add months processed by worker
-		for _, month := range processed.months {
-			res.DonationMonthFreq[month]++
-		}
-
-		// use full names to count people
-		for _, fullName := range processed.fullNames {
-			fullNameCount[fullName] = true
-		}
-		res.PeopleCount = len(fullNameCount)
-
-		// update most common first name based on processed results
-		for _, firstName := range processed.firstNames {
-			firstNameCount[firstName]++
-
-			if firstNameCount[firstName] > res.CommonNameCount {
-				res.CommonName = firstName
-				res.CommonNameCount = firstNameCount[firstName]
-			}
-		}
-	}
+	res := process("./data/test.txt")
 
 	js, err := json.Marshal(res)
 
@@ -69,4 +49,61 @@ func main() {
 	} else {
 		fmt.Printf("%s", js)
 	}
+}
+
+func process(path string) result {
+	res := result{DonationMonthFreq: map[string]int{}}
+	lines := make(chan parsed)
+	results := make(chan subTotal)
+	var wg sync.WaitGroup
+
+	for i := 0; i < runtime.NumCPU(); i++ {
+		wg.Add(1)
+		go worker(lines, results, &wg)
+	}
+	go read(path, lines)
+	go workerWatcher(results, &wg)
+
+	return summarize(results, res)
+}
+
+func summarize(results chan subTotal, res result) result {
+	finalSubtotal := subTotal{
+		numRows:           0,
+		nameCount:         map[string]int{},
+		fullNameCount:     map[string]int{},
+		donationMonthFreq: make([]int, 13)}
+
+	for currentSubtotal := range results {
+		finalSubtotal.numRows += currentSubtotal.numRows
+		for k, v := range currentSubtotal.nameCount {
+			finalSubtotal.nameCount[k] += v
+		}
+		for k, v := range currentSubtotal.fullNameCount {
+			finalSubtotal.fullNameCount[k] += v
+		}
+		for k, v := range currentSubtotal.donationMonthFreq {
+			finalSubtotal.donationMonthFreq[k] += v
+		}
+	}
+	res.NumRows = finalSubtotal.numRows
+	res.PeopleCount = len(finalSubtotal.fullNameCount)
+	res.CommonName, res.CommonNameCount = mostCommon(finalSubtotal.nameCount)
+	res.DonationMonthFreq = convertToMap(finalSubtotal.donationMonthFreq)
+	return res
+}
+
+func convertToMap(i []int) map[string]int {
+	m := make(map[string]int)
+	for k, v := range i {
+		if k != 0 {
+			m[fmt.Sprintf("%02d", k)] = v
+		}
+	}
+	return m
+}
+
+func workerWatcher(results chan subTotal, wg *sync.WaitGroup) {
+	wg.Wait()
+	close(results)
 }

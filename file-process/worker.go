@@ -1,48 +1,31 @@
 package main
 
 import (
-	"context"
+	"strconv"
 	"strings"
+	"sync"
 )
 
-type Processed struct {
-	fullNames  []string
-	firstNames []string
-	months     []string
-	numRows    int
+func worker(input chan parsed, results chan subTotal, wg *sync.WaitGroup) {
+
+	defer wg.Done()
+	subTotal := subTotal{donationMonthFreq: make([]int, 13), fullNameCount: map[string]int{}, nameCount: map[string]int{}}
+	for row := range input {
+		firstName, fullName, months := processRow(row)
+		subTotal.fullNameCount[fullName]++
+		subTotal.nameCount[firstName]++
+		subTotal.donationMonthFreq[months]++
+		subTotal.numRows++
+	}
+	results <- subTotal
 }
 
-func Worker(ctx context.Context, rowBatch <-chan []string) <-chan Processed {
-	out := make(chan Processed)
-
-	go func() {
-		defer close(out)
-
-		p := Processed{}
-
-		for rowB := range rowBatch {
-			for _, row := range rowB {
-				firstName, fullName, months := processRow(row)
-				p.fullNames = append(p.fullNames, fullName)
-				p.firstNames = append(p.firstNames, firstName)
-				p.months = append(p.months, months)
-				p.numRows++
-			}
-		}
-		out <- p
-	}()
-
-	return out
-}
-
-func processRow(text string) (firstName, fullName, month string) {
-	row := strings.Split(text, "|")
-
+func processRow(row parsed) (firstName string, fullName string, month int) {
 	// extract full name
-	fullName = strings.Replace(strings.TrimSpace(row[7]), " ", "", -1)
+	fullName = strings.Replace(strings.TrimSpace(row.fullName), " ", "", -1)
 
 	// extract first name
-	name := strings.TrimSpace(row[7])
+	name := strings.TrimSpace(row.fullName)
 	if name != "" {
 		startOfName := strings.Index(name, ", ") + 2
 		if endOfName := strings.Index(name[startOfName:], " "); endOfName < 0 {
@@ -56,11 +39,11 @@ func processRow(text string) (firstName, fullName, month string) {
 	}
 
 	// extract month
-	date := strings.TrimSpace(row[13])
+	date := strings.TrimSpace(row.date)
 	if len(date) == 8 {
-		month = date[:2]
+		month, _ = strconv.Atoi(date[:2])
 	} else {
-		month = "--"
+		month = 0
 	}
 
 	return firstName, fullName, month

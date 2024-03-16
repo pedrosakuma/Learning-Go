@@ -2,15 +2,11 @@ package main
 
 import (
 	"bufio"
-	"context"
+	"bytes"
 	"os"
 )
 
-var batchSize = 100
-
-func Read(file string, ctx context.Context, rowsBatch *[]string) <-chan []string {
-	out := make(chan []string)
-
+func read(file string, output chan parsed) {
 	f, err := os.Open(file)
 
 	if err != nil {
@@ -18,33 +14,15 @@ func Read(file string, ctx context.Context, rowsBatch *[]string) <-chan []string
 	}
 
 	scanner := bufio.NewScanner(f)
+	defer close(output)
 
-	go func() {
-		defer close(out)
+	pipe := []byte{byte('|')}
 
-		for {
-			scanned := scanner.Scan()
-			select {
-			case <-ctx.Done():
-				return
-
-			default:
-				row := scanner.Text()
-
-				if len(*rowsBatch) == batchSize || !scanned {
-					out <- *rowsBatch
-					*rowsBatch = []string{}
-				}
-
-				*rowsBatch = append(*rowsBatch, row)
-			}
-
-			if !scanned {
-				return
-			}
-		}
-
-	}()
-
-	return out
+	for scanner.Scan() {
+		b := scanner.Bytes()
+		// split does not allocate, only slices the original byte slice
+		value := bytes.Split(b, pipe)
+		// can't avoid allocation here, scanner buffer is reused
+		output <- parsed{fullName: string(value[7]), date: string(value[13])}
+	}
 }
