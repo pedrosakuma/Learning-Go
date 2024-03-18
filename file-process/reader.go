@@ -3,10 +3,11 @@ package main
 import (
 	"bufio"
 	"bytes"
+	"context"
 	"os"
 )
 
-func read(file string, output chan parsed) {
+func read(ctx context.Context, file string, output chan parsed) {
 	f, err := os.Open(file)
 
 	if err != nil {
@@ -19,10 +20,15 @@ func read(file string, output chan parsed) {
 	pipe := []byte{byte('|')}
 
 	for scanner.Scan() {
-		b := scanner.Bytes()
-		// split does not allocate, only slices the original byte slice
-		value := bytes.Split(b, pipe)
-		// can't avoid allocation here, scanner buffer is reused
-		output <- parsed{fullName: string(value[7]), date: string(value[13])}
+		select {
+		case <-ctx.Done():
+			return
+		default:
+			b := scanner.Bytes()
+			// split does not allocate, only slices the original byte slice
+			value := bytes.Split(b, pipe)
+			// can't avoid allocation here, scanner buffer is reused
+			output <- parsed{fullName: string(value[7]), date: string(value[13])}
+		}
 	}
 }

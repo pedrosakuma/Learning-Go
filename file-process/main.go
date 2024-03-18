@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"runtime"
@@ -25,21 +26,20 @@ type subTotal struct {
 	donationMonthFreq []int
 }
 
-func mostCommon(nameCount map[string]int) (string, int) {
-	var max int
-	var maxKey string
+func mostCommon(nameCount map[string]int) (maxKey string, max int) {
 	for k, v := range nameCount {
 		if v > max {
 			max = v
 			maxKey = k
 		}
 	}
-	return maxKey, max
+	return
 }
 
 func main() {
+	ctx := context.Background()
 
-	res := process("./data/test.txt")
+	res := process(ctx, "./data/test.txt")
 
 	js, err := json.Marshal(res)
 
@@ -51,23 +51,23 @@ func main() {
 	}
 }
 
-func process(path string) result {
-	res := result{DonationMonthFreq: map[string]int{}}
+func process(ctx context.Context, path string) result {
 	lines := make(chan parsed)
 	results := make(chan subTotal)
 	var wg sync.WaitGroup
 
 	for i := 0; i < runtime.NumCPU(); i++ {
 		wg.Add(1)
-		go worker(lines, results, &wg)
+		go worker(ctx, lines, results, &wg)
 	}
-	go read(path, lines)
+	go read(ctx, path, lines)
 	go workerWatcher(results, &wg)
 
-	return summarize(results, res)
+	return summarize(results)
 }
 
-func summarize(results chan subTotal, res result) result {
+func summarize(results chan subTotal) result {
+	res := result{DonationMonthFreq: map[string]int{}}
 	finalSubtotal := subTotal{
 		numRows:           0,
 		nameCount:         map[string]int{},

@@ -1,9 +1,14 @@
 package main
 
-import "testing"
+import (
+	"context"
+	"testing"
+)
 
 func TestGetVal(t *testing.T) {
+	ctx := context.Background()
+
 	for i := 0; i < 1000; i++ {
-		process("./data/test.txt")
+		process(ctx, "./data/test.txt")
 	}
 }

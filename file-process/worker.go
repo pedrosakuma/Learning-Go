@@ -1,21 +1,27 @@
 package main
 
 import (
+	"context"
 	"strconv"
 	"strings"
 	"sync"
 )
 
-func worker(input chan parsed, results chan subTotal, wg *sync.WaitGroup) {
+func worker(ctx context.Context, input chan parsed, results chan subTotal, wg *sync.WaitGroup) {
 
 	defer wg.Done()
 	subTotal := subTotal{donationMonthFreq: make([]int, 13), fullNameCount: map[string]int{}, nameCount: map[string]int{}}
 	for row := range input {
-		firstName, fullName, months := processRow(row)
-		subTotal.fullNameCount[fullName]++
-		subTotal.nameCount[firstName]++
-		subTotal.donationMonthFreq[months]++
-		subTotal.numRows++
+		select {
+		case <-ctx.Done():
+			return
+		default:
+			firstName, fullName, months := processRow(row)
+			subTotal.fullNameCount[fullName]++
+			subTotal.nameCount[firstName]++
+			subTotal.donationMonthFreq[months]++
+			subTotal.numRows++
+		}
 	}
 	results <- subTotal
 }
@@ -46,5 +52,5 @@ func processRow(row parsed) (firstName string, fullName string, month int) {
 		month = 0
 	}
 
-	return firstName, fullName, month
+	return
 }
